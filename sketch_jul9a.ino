@@ -1,5 +1,3 @@
-// C++ code
-
 #define INPUT_LEFT 25
 #define INPUT_RIGHT 33
 #define INPUT_KICK 32
@@ -21,11 +19,12 @@ struct Player {
   }
 
   void move() {
-    digitalWrite(OUTPUT_EN, LOW); // Ativa o motor
-    digitalWrite(OUTPUT_PULSE, HIGH);
+    digitalWrite(OUTPUT_EN, LOW); // Ativa o motor.
+    digitalWrite(OUTPUT_PULSE, HIGH); // Dá um pulso no motor.
     delayMicroseconds(STEP_DELAY);
     digitalWrite(OUTPUT_PULSE, LOW);
     delayMicroseconds(STEP_DELAY);
+    digitalWrite(OUTPUT_EN, HIGH); // Desativa o motor.
   }
 
   void moveLeft() {
@@ -41,10 +40,10 @@ struct Player {
   void kick() {
     unsigned long deltaTime = millis() - lastKickTime;
   
-    if (deltaTime > 500) {
+    if (deltaTime > 650) {
       digitalWrite(OUTPUT_KICK, LOW); // Desativa a solenoide para chute.
-      Serial.println("Chute.");
       delay(250);
+      digitalWrite(OUTPUT_KICK, HIGH); // Recolhe a solenoide depois de um chute.
       
       lastKickTime = millis();
     }
@@ -58,9 +57,6 @@ struct Player {
     bool hitRBorder = digitalRead(HIT_R_BORDER);
     
     bool isInputKickPressed = digitalRead(INPUT_KICK);
-    
-    digitalWrite(OUTPUT_KICK, HIGH); // Recolhe a solenoide depois de um chute.
-    digitalWrite(OUTPUT_EN, HIGH); // Desativa o motor
     
     if (isInputLPressed && !isInputRPressed && !hitLBorder) moveLeft();
     if (isInputRPressed && !isInputLPressed && !hitRBorder) moveRight();
@@ -84,7 +80,8 @@ void setup()
   pinMode(OUTPUT_PULSE, OUTPUT);
   pinMode(OUTPUT_KICK, OUTPUT);
 
-  Serial.begin(9600);
+  digitalWrite(OUTPUT_KICK, HIGH); // Inicia a solenoide recolhida.
+  digitalWrite(OUTPUT_EN, HIGH); // Inicia o motor desativado.
 }
 
 void loop()
