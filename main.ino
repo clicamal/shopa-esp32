@@ -5,16 +5,18 @@
 #define HIT_R_BORDER 35
 
 #define OUTPUT_EN 12
-#define OUTPUT_DIR 13
+#define OUTPUT_DIR 27
 #define OUTPUT_PULSE 14
 #define OUTPUT_KICK 26
 
 #define STEP_DELAY 525
 
 struct Player {
+  bool isKicking;
   unsigned long lastKickTime;
 
   Player() {
+    isKicking = false;
     lastKickTime = 0;
   }
 
@@ -39,12 +41,12 @@ struct Player {
 
   void kick() {
     unsigned long deltaTime = millis() - lastKickTime;
-  
-    if (deltaTime > 650) {
-      digitalWrite(OUTPUT_KICK, LOW); // Desativa a solenoide para chute.
-      delay(250);
-      digitalWrite(OUTPUT_KICK, HIGH); // Recolhe a solenoide depois de um chute.
-      
+
+    if (!isKicking && deltaTime > 250) {
+      digitalWrite(OUTPUT_KICK, HIGH); // Desativa a solenoide para chute.
+      delay(200);
+      digitalWrite(OUTPUT_KICK, LOW); // Recolhe a solenoide depois de um chute.
+
       lastKickTime = millis();
     }
   }
@@ -61,7 +63,14 @@ struct Player {
     if (isInputLPressed && !isInputRPressed && !hitLBorder) moveLeft();
     if (isInputRPressed && !isInputLPressed && !hitRBorder) moveRight();
     
-    if (isInputKickPressed) kick();
+    if (isInputKickPressed) {
+      kick();
+      isKicking = true;
+    }
+
+    else {
+      isKicking = false;
+    }
   }
 };
 
@@ -80,7 +89,7 @@ void setup()
   pinMode(OUTPUT_PULSE, OUTPUT);
   pinMode(OUTPUT_KICK, OUTPUT);
 
-  digitalWrite(OUTPUT_KICK, HIGH); // Inicia a solenoide recolhida.
+  digitalWrite(OUTPUT_KICK, LOW); // Inicia a solenoide recolhida.
   digitalWrite(OUTPUT_EN, HIGH); // Inicia o motor desativado.
 }
 
