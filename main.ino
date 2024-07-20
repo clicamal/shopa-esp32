@@ -50,31 +50,30 @@ struct Player {
       lastKickTime = millis();
     }
   }
+};
 
-  void update() {
-    bool isInputLPressed = digitalRead(INPUT_LEFT);
-    bool isInputRPressed = digitalRead(INPUT_RIGHT);
-    
-    bool hitLBorder = digitalRead(HIT_L_BORDER);
-    bool hitRBorder = digitalRead(HIT_R_BORDER);
-    
-    bool isInputKickPressed = digitalRead(INPUT_KICK);
-    
-    if (isInputLPressed && !isInputRPressed && !hitLBorder) moveLeft();
-    if (isInputRPressed && !isInputLPressed && !hitRBorder) moveRight();
-    
+TaskHandle_t playerKickTask;
+
+Player player;
+
+bool isInputLPressed, isInputRPressed, hitLBorder, hitRBorder;
+
+void playerKickTaskCode(void *param) {
+  bool isInputKickPressed;
+
+  while (true) {
+    isInputKickPressed = digitalRead(INPUT_KICK);
+
     if (isInputKickPressed) {
-      kick();
-      isKicking = true;
+      player.kick();
+      player.isKicking = true;
     }
 
     else {
-      isKicking = false;
+      player.isKicking = false;
     }
   }
-};
-
-Player player;
+}
 
 void setup()
 {
@@ -91,9 +90,26 @@ void setup()
 
   digitalWrite(OUTPUT_KICK, LOW); // Inicia a solenoide recolhida.
   digitalWrite(OUTPUT_EN, HIGH); // Inicia o motor desativado.
+
+  xTaskCreatePinnedToCore(
+    playerKickTaskCode,
+    "playerKickTask",
+    10000,
+    NULL,
+    0,
+    &playerKickTask,
+    0
+  );
 }
 
 void loop()
 {
-  player.update();
+  isInputLPressed = digitalRead(INPUT_LEFT);
+  isInputRPressed = digitalRead(INPUT_RIGHT);
+
+  hitLBorder = digitalRead(HIT_L_BORDER);
+  hitRBorder = digitalRead(HIT_R_BORDER);
+
+  if (isInputLPressed && !isInputRPressed && !hitLBorder) player.moveLeft();
+  if (isInputRPressed && !isInputLPressed && !hitRBorder) player.moveRight();
 }
