@@ -1,5 +1,4 @@
 #include <BluetoothSerial.h>
-#include <queue>
 
 const uint8_t INPUT_LEFT = 25;
 const uint8_t INPUT_RIGHT = 33;
@@ -16,9 +15,22 @@ const unsigned short STEP_DELAY = 525;
 const unsigned short KICK_DELAY = 200;
 const unsigned short KICK_COOLDOWN = 250;
 
-void println(const char msg[]) {
-  if (Serial.available()) Serial.println(msg);
-}
+const unsigned short PLAYER_NUM = 0;
+
+
+bool isInputLPressed, isInputRPressed, isInputKickPressed, hitLBorder, hitRBorder;
+
+SemaphoreHandle_t xMutex;
+
+TaskHandle_t playerKickTask;
+
+char sBTInput, lastSBTDInput = 'N';
+
+BluetoothSerial SerialBT;
+
+void println(const char msg[]);
+
+void playerKickTaskCode(void *param);
 
 struct Player {
   bool isKicking;
@@ -62,25 +74,25 @@ struct Player {
   }
 };
 
-TaskHandle_t playerKickTask;
-
 Player player;
 
-bool isInputLPressed, isInputRPressed, hitLBorder, hitRBorder;
+void println(const char msg[]) {
+  if (Serial.available()) Serial.println(msg);
+}
 
 void playerKickTaskCode(void *param) {
-  bool isInputKickPressed;
-
   while (true) {
-    isInputKickPressed = digitalRead(INPUT_KICK);
+    if (xSemaphoreTake(xMutex, portMAX_DELAY) == pdTRUE) {
+      if (isInputKickPressed) {
+        player.kick();
+        player.isKicking = true;
+      } else {
+        player.isKicking = false;
+      }
 
-    if (isInputKickPressed) {
-      player.kick();
-      player.isKicking = true;
-    }
+      isInputKickPressed = false;
 
-    else {
-      player.isKicking = false;
+      xSemaphoreGive(xMutex);
     }
 
     vTaskDelay(10 / portTICK_PERIOD_MS);
@@ -89,6 +101,8 @@ void playerKickTaskCode(void *param) {
 
 void setup()
 {
+  String dvcBTName = "Shopa Player ";
+
   pinMode(INPUT_LEFT, INPUT);
   pinMode(INPUT_RIGHT, INPUT);
   pinMode(INPUT_KICK, INPUT);
@@ -103,6 +117,8 @@ void setup()
   digitalWrite(OUTPUT_KICK, LOW); // Inicia a solenoide recolhida.
   digitalWrite(OUTPUT_EN, HIGH); // Inicia o motor desativado.
 
+  xMutex = xSemaphoreCreateMutex();
+
   xTaskCreatePinnedToCore(
     playerKickTaskCode,
     "playerKickTask",
@@ -113,17 +129,56 @@ void setup()
     0
   );
 
+  SerialBT.begin(dvcBTName + String(PLAYER_NUM));
+
   Serial.begin(9600);
 }
 
 void loop()
 {
-  isInputLPressed = digitalRead(INPUT_LEFT);
-  isInputRPressed = digitalRead(INPUT_RIGHT);
-
   hitLBorder = digitalRead(HIT_L_BORDER);
   hitRBorder = digitalRead(HIT_R_BORDER);
+  
+  if (xSemaphoreTake(xMutex, portMAX_DELAY) == pdTRUE) {
+    if (!SerialBT.connected()) {
+      isInputLPressed = digitalRead(INPUT_LEFT);
+      isInputRPressed = digitalRead(INPUT_RIGHT);
 
-  if (isInputLPressed && !isInputRPressed && !hitLBorder) player.moveLeft();
-  if (isInputRPressed && !isInputLPressed && !hitRBorder) player.moveRight();
+      isInputKickPressed = digitalRead(INPUT_KICK);
+    }
+
+    else {
+      sBTInput = SerialBT.read();
+
+      switch (sBTInput) {
+        case 'L':
+          isInputLPressed = true;
+          lastSBTDInput = sBTInput;
+          break;
+
+        case 'R':
+          isInputRPressed = true;
+          lastSBTDInput = sBTInput;
+          break;
+
+        case 'K':
+          isInputKickPressed = true;
+          break;
+        case 'N':
+          if (lastSBTDInput == 'L') isInputLPressed = false;
+          if (lastSBTDInput == 'R') isInputRPressed = false;
+          break;
+      }
+    }
+
+    xSemaphoreGive(xMutex);
+  }
+
+  if (isInputLPressed && !isInputRPressed && !hitLBorder) {
+    player.moveLeft();
+  }
+
+  if (isInputRPressed && !isInputLPressed && !hitRBorder) {
+    player.moveRight();
+  }
 }
