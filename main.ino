@@ -1,3 +1,6 @@
+#include <BluetoothSerial.h>
+#include <queue>
+
 const uint8_t INPUT_LEFT = 25;
 const uint8_t INPUT_RIGHT = 33;
 const uint8_t INPUT_KICK = 32;
@@ -12,8 +15,6 @@ const uint8_t OUTPUT_KICK = 26;
 const unsigned short STEP_DELAY = 525;
 const unsigned short KICK_DELAY = 200;
 const unsigned short KICK_COOLDOWN = 250;
-
-const uint8_t PLAYER_NUM = 1;
 
 void println(const char msg[]) {
   if (Serial.available()) Serial.println(msg);
@@ -65,31 +66,29 @@ TaskHandle_t playerKickTask;
 
 Player player;
 
-bool isInputLPressed = false, isInputRPressed = false, hitLBorder = false, hitRBorder = false, isInputKickPressed = false;
-
-SemaphoreHandle_t xMutex;
+bool isInputLPressed, isInputRPressed, hitLBorder, hitRBorder;
 
 void playerKickTaskCode(void *param) {
-  while (true) {
-    xSemaphoreTake(xMutex, portMAX_DELAY);
+  bool isInputKickPressed;
 
+  while (true) {
     isInputKickPressed = digitalRead(INPUT_KICK);
 
     if (isInputKickPressed) {
       player.kick();
       player.isKicking = true;
-    } else {
+    }
+
+    else {
       player.isKicking = false;
     }
 
-    xSemaphoreGive(xMutex);
     vTaskDelay(10 / portTICK_PERIOD_MS);
   }
 }
 
-void setup() {
-  String btDvcName;
-
+void setup()
+{
   pinMode(INPUT_LEFT, INPUT);
   pinMode(INPUT_RIGHT, INPUT);
   pinMode(INPUT_KICK, INPUT);
@@ -104,14 +103,12 @@ void setup() {
   digitalWrite(OUTPUT_KICK, LOW); // Inicia a solenoide recolhida.
   digitalWrite(OUTPUT_EN, HIGH); // Inicia o motor desativado.
 
-  xMutex = xSemaphoreCreateMutex();
-
   xTaskCreatePinnedToCore(
     playerKickTaskCode,
     "playerKickTask",
     10000,
     NULL,
-    1,
+    0,
     &playerKickTask,
     0
   );
@@ -119,23 +116,14 @@ void setup() {
   Serial.begin(9600);
 }
 
-void loop() {
-  xSemaphoreTake(xMutex, portMAX_DELAY);
-
+void loop()
+{
   isInputLPressed = digitalRead(INPUT_LEFT);
   isInputRPressed = digitalRead(INPUT_RIGHT);
+
   hitLBorder = digitalRead(HIT_L_BORDER);
   hitRBorder = digitalRead(HIT_R_BORDER);
 
-  if (isInputLPressed && !isInputRPressed && !hitLBorder) {
-    player.moveLeft();
-    isInputLPressed = false;
-  }
-
-  if (isInputRPressed && !isInputLPressed && !hitRBorder) {
-    player.moveRight();
-    isInputRPressed = false;
-  }
-
-  xSemaphoreGive(xMutex);
+  if (isInputLPressed && !isInputRPressed && !hitLBorder) player.moveLeft();
+  if (isInputRPressed && !isInputLPressed && !hitRBorder) player.moveRight();
 }
