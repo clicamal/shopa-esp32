@@ -1,6 +1,3 @@
-#include <BluetoothSerial.h>
-#include <queue>
-
 const uint8_t INPUT_LEFT = 25;
 const uint8_t INPUT_RIGHT = 33;
 const uint8_t INPUT_KICK = 32;
