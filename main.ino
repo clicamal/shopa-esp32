@@ -16,6 +16,18 @@ const unsigned short STEP_DELAY = 525;
 const unsigned short KICK_DELAY = 200;
 const unsigned short KICK_COOLDOWN = 250;
 
+const uint8_t LIFE_LEDS[10] = {
+  [0] = 22,
+  [1] = 21,
+  [2] = 19,
+  [3] = 18,
+  [4] = 5,
+  [5] = 17,
+  [6] = 16,
+  [7] = 4,
+  [8] = 2,
+  [9] = 15
+};
 
 bool isInputLPressed, isInputRPressed, isInputKickPressed, hitLBorder, hitRBorder;
 
@@ -96,6 +108,11 @@ void setup()
   pinMode(OUTPUT_DIR, OUTPUT);
   pinMode(OUTPUT_PULSE, OUTPUT);
   pinMode(OUTPUT_KICK, OUTPUT);
+
+  for (short i = 9; i >= 0; i--) {
+    pinMode(LIFE_LEDS[i], OUTPUT);
+    digitalWrite(LIFE_LEDS[i], LOW);
+  }
 
   digitalWrite(OUTPUT_KICK, LOW); // Inicia a solenoide recolhida.
   digitalWrite(OUTPUT_EN, HIGH); // Inicia o motor desativado.
