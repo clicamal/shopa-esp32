@@ -5,6 +5,7 @@ const uint8_t INPUT_RIGHT = 33;
 const uint8_t INPUT_KICK = 32;
 const uint8_t HIT_L_BORDER = 34;
 const uint8_t HIT_R_BORDER = 35;
+const uint8_t INPUT_TK_DMG = 33;
 
 const uint8_t OUTPUT_EN = 12;
 const uint8_t OUTPUT_DIR = 27;
@@ -14,8 +15,6 @@ const uint8_t OUTPUT_KICK = 26;
 const unsigned short STEP_DELAY = 525;
 const unsigned short KICK_DELAY = 200;
 const unsigned short KICK_COOLDOWN = 250;
-
-const unsigned short PLAYER_NUM = 0;
 
 
 bool isInputLPressed, isInputRPressed, isInputKickPressed, hitLBorder, hitRBorder;
@@ -28,66 +27,50 @@ char sBTInput, lastSBTDInput = 'N';
 
 BluetoothSerial SerialBT;
 
-void println(const char msg[]);
-
 void playerKickTaskCode(void *param);
 
-struct Player {
-  bool isKicking;
-  unsigned long lastKickTime;
+bool isKicking = false;
+unsigned long lastKickTime = 0;
 
-  Player(): isKicking(false), lastKickTime(0) {}
+void move() {
+  digitalWrite(OUTPUT_EN, LOW); // Ativa o motor.
+  digitalWrite(OUTPUT_PULSE, HIGH); // Dá um pulso no motor.
+  delayMicroseconds(STEP_DELAY);
+  digitalWrite(OUTPUT_PULSE, LOW);
+  delayMicroseconds(STEP_DELAY);
+  digitalWrite(OUTPUT_EN, HIGH); // Desativa o motor.
+}
 
-  void move() {
-    digitalWrite(OUTPUT_EN, LOW); // Ativa o motor.
-    digitalWrite(OUTPUT_PULSE, HIGH); // Dá um pulso no motor.
-    delayMicroseconds(STEP_DELAY);
-    digitalWrite(OUTPUT_PULSE, LOW);
-    delayMicroseconds(STEP_DELAY);
-    digitalWrite(OUTPUT_EN, HIGH); // Desativa o motor.
+void moveLeft() {
+  digitalWrite(OUTPUT_DIR, HIGH);
+  move();
+}
+
+void moveRight() {
+  digitalWrite(OUTPUT_DIR, LOW);
+  move();
+}
+
+void kick() {
+  unsigned long deltaTime = millis() - lastKickTime;
+
+  if (!isKicking && deltaTime > KICK_COOLDOWN) {
+    digitalWrite(OUTPUT_KICK, HIGH); // Desativa a solenoide para chute.
+    delay(KICK_DELAY);
+    digitalWrite(OUTPUT_KICK, LOW); // Recolhe a solenoide depois de um chute.
+
+    lastKickTime = millis();
   }
-
-  void moveLeft() {
-    digitalWrite(OUTPUT_DIR, HIGH);
-    println("Movendo para a esquerda.");
-    move();
-  }
-
-  void moveRight() {
-    digitalWrite(OUTPUT_DIR, LOW);
-    println("Movendo para a direita.");
-    move();
-  }
-
-  void kick() {
-    unsigned long deltaTime = millis() - lastKickTime;
-
-    if (!isKicking && deltaTime > KICK_COOLDOWN) {
-      digitalWrite(OUTPUT_KICK, HIGH); // Desativa a solenoide para chute.
-      delay(KICK_DELAY);
-      digitalWrite(OUTPUT_KICK, LOW); // Recolhe a solenoide depois de um chute.
-
-      lastKickTime = millis();
-
-      println("Chute.");
-    }
-  }
-};
-
-Player player;
-
-void println(const char msg[]) {
-  if (Serial.available()) Serial.println(msg);
 }
 
 void playerKickTaskCode(void *param) {
   while (true) {
     if (xSemaphoreTake(xMutex, portMAX_DELAY) == pdTRUE) {
       if (isInputKickPressed) {
-        player.kick();
-        player.isKicking = true;
+        kick();
+        isKicking = true;
       } else {
-        player.isKicking = false;
+        isKicking = false;
       }
 
       isInputKickPressed = false;
@@ -101,7 +84,7 @@ void playerKickTaskCode(void *param) {
 
 void setup()
 {
-  String dvcBTName = "Shopa Player ";
+  String dvcBTName = "Shopa Player";
 
   pinMode(INPUT_LEFT, INPUT);
   pinMode(INPUT_RIGHT, INPUT);
@@ -129,7 +112,7 @@ void setup()
     0
   );
 
-  SerialBT.begin(dvcBTName + String(PLAYER_NUM));
+  SerialBT.begin(dvcBTName);
 
   Serial.begin(9600);
 }
@@ -175,10 +158,10 @@ void loop()
   }
 
   if (isInputLPressed && !isInputRPressed && !hitLBorder) {
-    player.moveLeft();
+    moveLeft();
   }
 
   if (isInputRPressed && !isInputLPressed && !hitRBorder) {
-    player.moveRight();
+    moveRight();
   }
 }
