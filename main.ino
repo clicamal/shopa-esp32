@@ -5,7 +5,7 @@ const uint8_t INPUT_RIGHT = 33;
 const uint8_t INPUT_KICK = 32;
 const uint8_t HIT_L_BORDER = 34;
 const uint8_t HIT_R_BORDER = 35;
-const uint8_t INPUT_TK_DMG = 33;
+const uint8_t INPUT_TK_DMG = 23;
 
 const uint8_t OUTPUT_EN = 12;
 const uint8_t OUTPUT_DIR = 27;
@@ -29,7 +29,9 @@ const uint8_t LIFE_LEDS[10] = {
   [9] = 15
 };
 
-bool isInputLPressed, isInputRPressed, isInputKickPressed, hitLBorder, hitRBorder;
+int8_t curLifeLed = 0;
+
+bool isInputLPressed, isInputRPressed, isInputKickPressed, hitLBorder, hitRBorder, isTakingDamage, tookDamage = false;
 
 SemaphoreHandle_t xMutex;
 
@@ -94,6 +96,27 @@ void playerKickTaskCode(void *param) {
   }
 }
 
+void takeDamage() {
+  if(!tookDamage) {
+    if (curLifeLed <= 9) {
+      digitalWrite(LIFE_LEDS[curLifeLed], LOW);
+      curLifeLed++;
+    }
+
+    else {
+      curLifeLed = 0;
+      initLifeLeds();
+    }
+  }
+}
+
+void initLifeLeds() {
+  for (int8_t i = 9; i >= 0; i--) {
+    digitalWrite(LIFE_LEDS[i], HIGH);
+    delay(250);
+  }
+}
+
 void setup()
 {
   String dvcBTName = "Shopa Player";
@@ -103,13 +126,14 @@ void setup()
   pinMode(INPUT_KICK, INPUT);
   pinMode(HIT_L_BORDER, INPUT);
   pinMode(HIT_R_BORDER, INPUT);
+  pinMode(INPUT_TK_DMG, INPUT);
   
   pinMode(OUTPUT_EN, OUTPUT);
   pinMode(OUTPUT_DIR, OUTPUT);
   pinMode(OUTPUT_PULSE, OUTPUT);
   pinMode(OUTPUT_KICK, OUTPUT);
 
-  for (short i = 9; i >= 0; i--) {
+  for (int8_t i = 9; i >= 0; i--) {
     pinMode(LIFE_LEDS[i], OUTPUT);
     digitalWrite(LIFE_LEDS[i], LOW);
   }
@@ -132,12 +156,16 @@ void setup()
   SerialBT.begin(dvcBTName);
 
   Serial.begin(9600);
+
+  initLifeLeds();
 }
 
 void loop()
 {
   hitLBorder = digitalRead(HIT_L_BORDER);
   hitRBorder = digitalRead(HIT_R_BORDER);
+
+  isTakingDamage = digitalRead(INPUT_TK_DMG);
   
   if (xSemaphoreTake(xMutex, portMAX_DELAY) == pdTRUE) {
     if (!SerialBT.connected()) {
@@ -180,5 +208,14 @@ void loop()
 
   if (isInputRPressed && !isInputLPressed && !hitRBorder) {
     moveRight();
+  }
+
+  if (isTakingDamage) {
+    takeDamage();
+    tookDamage = true;
+  }
+
+  else {
+    tookDamage = false;
   }
 }
