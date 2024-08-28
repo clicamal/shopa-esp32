@@ -46,6 +46,8 @@ void playGameoverSound(void);
 unsigned long lastKickTime = 0;
 
 void moveMotor(bool direction) {
+  Serial.println("Mover na direção " + String(direction));
+
   digitalWrite(OUTPUT_DIR, direction);
   digitalWrite(OUTPUT_EN, LOW);
   digitalWrite(OUTPUT_PULSE, HIGH);
@@ -57,11 +59,14 @@ void moveMotor(bool direction) {
 
 void kick(void) {
   unsigned long deltaTime = millis() - lastKickTime;
+
   if (!isKicking && deltaTime > KICK_COOLDOWN) {
     digitalWrite(OUTPUT_KICK, HIGH);
     delay(KICK_DELAY);
     digitalWrite(OUTPUT_KICK, LOW);
     lastKickTime = millis();
+
+    Serial.println("Chutar");
   }
 }
 
@@ -87,10 +92,14 @@ void takeDamage(void) {
       digitalWrite(LIFE_LEDS[curLifeLed], LOW);
       curLifeLed++;
       playDmgSound();
+
+      Serial.println("Tomar dano");
     } else {
+      Serial.println("Game-over");
+
       curLifeLed = 0;
 
-      for (int i = 14; i >= 0; i--) {
+      for (int i = 15; i >= 0; i--) {
         toggleLeds();
         delay(150);
       }
@@ -109,13 +118,13 @@ void initLifeLeds(void) {
 }
 
 void toggleLeds(void) {
-  static bool curState = LOW;
+  static bool curState = HIGH;
 
   for (uint8_t pin : LIFE_LEDS) {
     digitalWrite(pin, curState);
   }
 
-  if (curState == LOW) curState = HIGH; else curState = LOW;
+  curState = (curState == HIGH) ? LOW : HIGH;
 }
 
 void playInitSong(void) {
