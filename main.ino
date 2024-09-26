@@ -1,6 +1,7 @@
 #include <BluetoothSerial.h>
 
 // Definições de pinos
+#define STEP_LIMIT 100
 constexpr uint8_t INPUT_LEFT = 25;
 constexpr uint8_t INPUT_RIGHT = 33;
 constexpr uint8_t INPUT_KICK = 32;
@@ -20,6 +21,8 @@ constexpr unsigned short KICK_COOLDOWN = 250;
 
 constexpr uint8_t LIFE_LEDS[] = {22, 21, 19, 18, 5, 17, 16, 4, 2, 15};
 
+int stepsFromLBorder = 0;
+
 int8_t curLifeLed = 0;
 
 bool isInputLPressed = false, isInputRPressed = false, isInputKickPressed = false;
@@ -30,6 +33,8 @@ SemaphoreHandle_t xMutex;
 TaskHandle_t playerKickTask;
 
 char sBTInput, lastSBTDInput = 'N';
+
+unsigned long lastKickTime = 0;
 
 BluetoothSerial SerialBT;
 
@@ -43,11 +48,7 @@ void playInitSong(void);
 void playDmgSound(void);
 void playGameoverSound(void);
 
-unsigned long lastKickTime = 0;
-
 void moveMotor(bool direction) {
-  Serial.println("Mover na direção " + String(direction));
-
   digitalWrite(OUTPUT_DIR, direction);
   digitalWrite(OUTPUT_EN, LOW);
   digitalWrite(OUTPUT_PULSE, HIGH);
@@ -55,6 +56,12 @@ void moveMotor(bool direction) {
   digitalWrite(OUTPUT_PULSE, LOW);
   delayMicroseconds(STEP_DELAY);
   digitalWrite(OUTPUT_EN, HIGH);
+
+  if (direction) {
+        stepsFromLBorder--; 
+    } else {
+        stepsFromLBorder++;
+    }
 }
 
 void kick(void) {
@@ -65,8 +72,6 @@ void kick(void) {
     delay(KICK_DELAY);
     digitalWrite(OUTPUT_KICK, LOW);
     lastKickTime = millis();
-
-    Serial.println("Chutar");
   }
 }
 
@@ -92,11 +97,7 @@ void takeDamage(void) {
       digitalWrite(LIFE_LEDS[curLifeLed], LOW);
       curLifeLed++;
       playDmgSound();
-
-      Serial.println("Tomar dano");
     } else {
-      Serial.println("Game-over");
-
       curLifeLed = 0;
 
       for (int i = 15; i >= 0; i--) {
@@ -176,8 +177,10 @@ void setup(void) {
 
   xTaskCreatePinnedToCore(playerKickTaskCode, "playerKickTask", 10000, NULL, 0, &playerKickTask, 0);
 
-  SerialBT.begin("Shopa Player");
+  SerialBT.begin("Shopa Player 1");
   Serial.begin(9600);
+
+  SerialBT.deleteAllBondedDevices();
 
   initLifeLeds();
   playInitSong();
@@ -185,7 +188,7 @@ void setup(void) {
 
 void loop(void) {
   hitLBorder = digitalRead(HIT_L_BORDER);
-  hitRBorder = digitalRead(HIT_R_BORDER);
+  hitRBorder = stepsFromLBorder < STEP_LIMIT ? false : true;
   isTakingDamage = digitalRead(INPUT_TK_DMG);
 
   if (xSemaphoreTake(xMutex, portMAX_DELAY) == pdTRUE) {
@@ -208,7 +211,10 @@ void loop(void) {
     xSemaphoreGive(xMutex);
   }
 
+  if (hitLBorder) stepsFromLBorder = 0;
+
   if (isInputLPressed && !isInputRPressed && !hitLBorder) moveMotor(true);
   if (isInputRPressed && !isInputLPressed && !hitRBorder) moveMotor(false);
+
   if (isTakingDamage) takeDamage(); else tookDamage = false;
 }
