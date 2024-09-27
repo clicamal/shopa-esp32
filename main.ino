@@ -1,27 +1,27 @@
 #include <BluetoothSerial.h>
 
 // Definições de pinos
-#define STEP_LIMIT 100
-constexpr uint8_t INPUT_LEFT = 25;
-constexpr uint8_t INPUT_RIGHT = 33;
-constexpr uint8_t INPUT_KICK = 32;
-constexpr uint8_t HIT_L_BORDER = 34;
-constexpr uint8_t HIT_R_BORDER = 35;
-constexpr uint8_t INPUT_TK_DMG = 23;
+#define STEP_LIMIT 2260
+#define INPUT_LEFT 25
+#define INPUT_RIGHT 33
+#define INPUT_KICK 32
+#define HIT_L_BORDER 34
+#define HIT_R_BORDER 35
+#define INPUT_TK_DMG 23
 
-constexpr uint8_t OUTPUT_EN = 13;
-constexpr uint8_t OUTPUT_DIR = 27;
-constexpr uint8_t OUTPUT_PULSE = 14;
-constexpr uint8_t OUTPUT_KICK = 26;
-constexpr uint8_t OUTPUT_BUZZER = 12;
+#define OUTPUT_EN 13
+#define OUTPUT_DIR 27
+#define OUTPUT_PULSE 14
+#define OUTPUT_KICK 26
+#define OUTPUT_BUZZER 12
 
-constexpr unsigned short STEP_DELAY = 525;
-constexpr unsigned short KICK_DELAY = 200;
-constexpr unsigned short KICK_COOLDOWN = 250;
+#define STEP_DELAY 525
+#define KICK_DELAY 200
+#define KICK_COOLDOWN 250
 
 constexpr uint8_t LIFE_LEDS[] = {22, 21, 19, 18, 5, 17, 16, 4, 2, 15};
 
-int stepsFromLBorder = 0;
+int stepCount = 0;
 
 int8_t curLifeLed = 0;
 
@@ -51,16 +51,18 @@ void playGameoverSound(void);
 void moveMotor(bool direction) {
   digitalWrite(OUTPUT_DIR, direction);
   digitalWrite(OUTPUT_EN, LOW);
+
   digitalWrite(OUTPUT_PULSE, HIGH);
   delayMicroseconds(STEP_DELAY);
   digitalWrite(OUTPUT_PULSE, LOW);
   delayMicroseconds(STEP_DELAY);
+
   digitalWrite(OUTPUT_EN, HIGH);
 
   if (direction) {
-        stepsFromLBorder--; 
+        stepCount++; 
     } else {
-        stepsFromLBorder++;
+        stepCount--;
     }
 }
 
@@ -187,8 +189,8 @@ void setup(void) {
 }
 
 void loop(void) {
-  hitLBorder = digitalRead(HIT_L_BORDER);
-  hitRBorder = stepsFromLBorder < STEP_LIMIT ? false : true;
+  hitLBorder = stepCount <= 0;
+  hitRBorder = stepCount >= STEP_LIMIT;
   isTakingDamage = digitalRead(INPUT_TK_DMG);
 
   if (xSemaphoreTake(xMutex, portMAX_DELAY) == pdTRUE) {
@@ -211,10 +213,10 @@ void loop(void) {
     xSemaphoreGive(xMutex);
   }
 
-  if (hitLBorder) stepsFromLBorder = 0;
+  if (hitLBorder) stepCount = 0;
 
-  if (isInputLPressed && !isInputRPressed && !hitLBorder) moveMotor(true);
-  if (isInputRPressed && !isInputLPressed && !hitRBorder) moveMotor(false);
+  if (isInputLPressed && !isInputRPressed && !hitLBorder) moveMotor(false);
+  if (isInputRPressed && !isInputLPressed && !hitRBorder) moveMotor(true);
 
   if (isTakingDamage) takeDamage(); else tookDamage = false;
 }
